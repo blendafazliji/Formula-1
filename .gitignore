@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+venv/
+.env
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+
+# VS Code
+.vscode/
+
+# PyCharm
+.idea/
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+
+# PostgreSQL
+*.sql.bak
+*.backup
+*.dump
+
+# Logs
+*.log
+
+# Temporary files
+temp/
+tmp/
+
+# CSV exports generated during processing
+exports/
+
+# MongoDB
+data/db/
+
+# Environment variables
+.env.local
