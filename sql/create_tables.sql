@@ -29,7 +29,8 @@ CREATE TABLE races (
     round INT NOT NULL,
     circuitId INT NOT NULL,
     name VARCHAR(100) NOT NULL,
-    raceDate DATE NOT NULL,
+    date VARCHAR(50),
+    time VARCHAR(50)
 
     CONSTRAINT fk_races_circuits
         FOREIGN KEY (circuitId)
