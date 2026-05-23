@@ -1,9 +1,9 @@
 #Top drivers by wins
-SELECT d.forename, COUNT(*) AS wins
+SELECT d.forename, d.surname, COUNT(*) AS wins
 FROM results r
-JOIN drivers d ON r.driverId = d.driverId
+JOIN drivers d ON d.driverid = r.driverid
 WHERE r.position = 1
-GROUP BY d.forename
+GROUP BY d.forename, d.surname
 ORDER BY wins DESC;
 
 # Top constructors
