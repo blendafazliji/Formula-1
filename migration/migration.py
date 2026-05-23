@@ -39,7 +39,7 @@ PG_CONFIG = {
     "port":     5432,
     "dbname":   "formula1",
     "user":     "postgres",
-    "password": "kanita",
+    "password": "password",
 }
 
 MONGO_CONFIG = {
