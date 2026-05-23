@@ -1,0 +1,22 @@
+============================================================
+   F1 DATA VALIDATION (PostgreSQL ↔ MongoDB)
+============================================================
+
+
+=== RECORD COUNT VALIDATION ===
+⚠ circuits: EMBEDDED IN MONGODB (PG=77, MG=0)
+✔ constructors: PASS (212)
+✔ drivers: PASS (861)
+✔ lap_times: PASS (589081)
+✔ races: PASS (1125)
+⚠ results: EMBEDDED IN MONGODB (PG=26759, MG=0)
+
+=== CHECKSUM: Top Driver Wins ===
+✔ Hamilton: PASS (103)
+
+=== SPOT CHECK: Top Constructor Wins ===
+✔ Ferrari: PASS (249)
+
+============================================================
+VALIDATION COMPLETE
+============================================================
