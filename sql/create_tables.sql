@@ -30,7 +30,7 @@ CREATE TABLE races (
     circuitId INT NOT NULL,
     name VARCHAR(100) NOT NULL,
     date VARCHAR(50),
-    time VARCHAR(50)
+    time VARCHAR(50),
 
     CONSTRAINT fk_races_circuits
         FOREIGN KEY (circuitId)
