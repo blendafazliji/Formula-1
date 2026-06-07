@@ -1,84 +1,99 @@
-# 🏎️ Formula 1 — Relational to NoSQL Migration
+# Formula 1 — Relational to NoSQL Migration
 
-Migration of the Formula 1 World Championship dataset from **PostgreSQL** to **MongoDB**, with automated validation and an interactive analytics dashboard.
-
-> **Course:** Databases — South East European University  
-> **Authors:** Blenda Fazliji, Kanita  
-> **Dataset:** [Ergast F1 Dataset via Kaggle](https://www.kaggle.com/datasets/rohanrao/formula-1-world-championship-1950-2020)
+A university database project demonstrating the migration of a Formula 1 dataset
+from a PostgreSQL relational database to MongoDB. The pipeline covers schema design,
+data population, programmatic migration with transformations, automated validation,
+and a Streamlit visualization dashboard.
 
 ---
 
-## 📁 Repository Structure
+## Project Structure
 
 ```
 Formula-1/
-├── dataset/              # Raw CSV files (circuits, drivers, constructors, races, results, lap_times)
-├── diagrams/             # ER diagram of the PostgreSQL schema
-├── sql/                  # SQL schema (CREATE TABLE) and analytical queries
-│   ├── schema.sql
-│   └── queries.sql
-├── migration/
-│   └── migrate.py        # PostgreSQL → MongoDB migration script
-├── validation/
-│   └── validate.py       # Automated validation (PostgreSQL ↔ MongoDB)
-├── nosql_queries/
-│   └── visualisation.py  # Streamlit analytics dashboard (reads from MongoDB)
-└── README.md
+    dataset/                Raw CSV files (Ergast F1 dataset)
+        circuits.csv
+        constructors.csv
+        drivers.csv
+        lap_times.csv
+        races.csv
+        results.csv
+
+    sql/                    PostgreSQL setup scripts
+        create_tables.sql   Table definitions
+        constraints.sql     Primary keys, foreign keys, check constraints
+        import_data.sql     CSV import instructions
+        queries.sql         Analytical queries for reference
+
+    diagrams/               ER diagrams (DBeaver + manual)
+
+    migration/
+        migration.py        PostgreSQL to MongoDB migration script
+
+    nosql_queries/
+        mongodb_queries.js  Equivalent MongoDB aggregation queries
+
+    validation/
+        dataValidation.py   Automated validation script (PG vs MongoDB)
+        output_sample.txt   Sample validation report output
+
+    visualization/
+        f1_dashboard.py     Streamlit dashboard (reads from MongoDB)
+
+    requirements.txt        Python dependencies
+    README.md               This file
 ```
 
 ---
 
-## 🗄️ Database Overview
+## Prerequisites
 
-### PostgreSQL (Source)
-
-| Table | Rows | Description |
-|-------|------|-------------|
-| circuits | 77 | Race circuits with GPS coordinates |
-| drivers | 861 | All F1 drivers |
-| constructors | 212 | All F1 teams |
-| races | 1,125 | Race events by year and round |
-| results | 26,759 | Per-driver race results |
-| lap_times | 589,081 | Individual lap records |
-
-### MongoDB (Target) — `f1_nosql`
-
-| Collection | Documents | Notes |
-|------------|-----------|-------|
-| races | 1,125 | Embeds circuit + all results; contains 5 derived fields |
-| drivers | 861 | Standalone collection |
-| constructors | 212 | Standalone collection |
-| lap_times | 589,081 | Separate high-volume collection |
+- Python 3.9 or higher
+- PostgreSQL 13 or higher (running locally on port 5432)
+- MongoDB 6 or higher (running locally on port 27017)
+- pip
 
 ---
 
-## ⚙️ Prerequisites
+## Installation
 
-Make sure the following are installed and running:
-
-- Python 3.8+
-- PostgreSQL (running on port 5432)
-- MongoDB (running on port 27017)
-- pip packages:
+Clone the repository and install Python dependencies:
 
 ```bash
-pip install psycopg2-binary pymongo streamlit plotly pandas
+git clone https://github.com/blendafazliji/Formula-1.git
+cd Formula-1
+pip install -r requirements.txt
 ```
 
 ---
 
-## 🚀 Running the Full Pipeline
+## Step 1 — Set Up the Relational Database
 
-### Step 1 — Set Up the PostgreSQL Database
+These steps are performed once. If you have already loaded the data into PostgreSQL,
+skip to Step 2.
 
-Open DBeaver (or any PostgreSQL client), connect to your server, and run:
+**1a. Create the database**
 
+Connect to PostgreSQL and create the target database:
+
+```sql
+CREATE DATABASE formula1;
 ```
-sql/schema.sql
+
+**1b. Create tables**
+
+Run the table creation script:
+
+```bash
+psql -U postgres -d formula1 -f sql/create_tables.sql
 ```
 
-Then import the CSV files from the `dataset/` folder in this order using DBeaver's CSV Import Wizard:
+**1c. Import the CSV data**
 
+The dataset is imported using DBeaver's CSV Import Wizard or psql COPY commands.
+See `sql/import_data.sql` for the correct import order and settings.
+
+Import order (respect foreign key dependencies):
 1. circuits
 2. constructors
 3. drivers
@@ -86,13 +101,31 @@ Then import the CSV files from the `dataset/` folder in this order using DBeaver
 5. results
 6. lap_times
 
-> CSV settings: Delimiter `,` · Header enabled · NULL value mark `\N` · Encoding UTF-8
+**1d. Apply constraints**
+
+```bash
+psql -U postgres -d formula1 -f sql/constraints.sql
+```
+
+After this step PostgreSQL should contain approximately:
+- circuits: 77 rows
+- constructors: 212 rows
+- drivers: 861 rows
+- races: 1,125 rows
+- results: 26,759 rows
+- lap_times: 589,081 rows
 
 ---
 
-### Step 2 — Configure Database Credentials
+## Step 2 — Run the Migration
 
-Open `migration/migrate.py` and `validation/validate.py` and fill in your credentials at the top of each file:
+The migration script reads from PostgreSQL and writes to MongoDB (database: `f1_nosql`).
+It is idempotent — running it more than once will not duplicate data.
+
+**Configure connection details**
+
+Open `migration/migration.py` and update the configuration block at the top if your
+PostgreSQL password or database name differs from the defaults:
 
 ```python
 PG_CONFIG = {
@@ -100,7 +133,7 @@ PG_CONFIG = {
     "port":     5432,
     "dbname":   "formula1",
     "user":     "postgres",
-    "password": "your_password",
+    "password": "your_password_here",
 }
 
 MONGO_CONFIG = {
@@ -109,123 +142,92 @@ MONGO_CONFIG = {
 }
 ```
 
----
-
-### Step 3 — Run the Migration
+**Run the migration**
 
 ```bash
-python migration/migrate.py
+python migration/migration.py
 ```
 
-The script will:
-- Migrate drivers, constructors, and lap_times as standalone collections
-- Build a rich `races` collection embedding circuit and results data
-- Compute 5 derived fields: `fastestLapMs`, `fastestLapTime`, `totalDrivers`, `winnerDriverName`, `winnerConstructorName`
-- Create indexes on all collections
+The script will log progress to the console. A full run over 589k lap time rows
+takes approximately 1 to 3 minutes depending on hardware.
 
-**The script is idempotent** — run it twice to verify no duplicates are created:
+MongoDB collections created:
+- drivers
+- constructors
+- lap_times
+- races (embeds circuit and results, includes derived fields)
+
+Derived fields computed during migration:
+- totalDrivers — count of drivers per race
+- winnerDriverId / winnerDriverName — driver with position = 1
+- winnerConstructorId / winnerConstructorName — constructor with position = 1
+- fastestLapMs / fastestLapTime — MIN(milliseconds) per driver per race from lap_times
+- driverName, driverNationality, constructorName — denormalized into embedded results
+
+---
+
+## Step 3 — Run the Validation
+
+The validation script connects to both databases and compares them across four layers:
+
+- Layer 1: Record counts per entity (including embedded collections)
+- Layer 2: Numeric aggregate checksums and an order-independent row hash on lap_times
+- Layer 3: Spot-check queries run on both databases and compared
+- Layer 4: Derived field checks on a random sample of races
+
+**Configure connection details**
+
+Open `validation/dataValidation.py` and update PG_CONFIG at the top if needed
+(same fields as the migration script). Alternatively set environment variables:
+
+```
+PG_HOST, PG_PORT, PG_DB, PG_USER, PG_PASSWORD
+MONGO_URI, MONGO_DB
+```
+
+**Run the validation**
 
 ```bash
-python migration/migrate.py   # first run
-python migration/migrate.py   # second run — safe, no duplicates
+python validation/dataValidation.py
 ```
+
+Output is printed to the console and written to `validation_report.log`.
+The script exits with code 0 if all checks pass, or code 1 if any check fails.
+
+Note: race 780 produces a known one-check failure due to a data quality issue in the
+Ergast source dataset — two drivers are recorded with position = 1 for that race.
+This is a source anomaly, not a migration error. All other checks pass.
 
 ---
 
-### Step 4 — Run the Validation
+## Step 4 — Run the Visualization Dashboard
+
+The dashboard reads exclusively from MongoDB and requires no PostgreSQL connection.
+
+**Run the dashboard**
 
 ```bash
-python validation/validate.py
+streamlit run visualization/f1_dashboard.py
 ```
 
-The validation script connects to both databases and checks:
+Then open your browser at `http://localhost:8501`.
 
-1. **Record counts** — all collections match PostgreSQL row counts
-2. **Driver wins checksum** — top 10 driver win counts match between both databases
-3. **Constructor wins spot-check** — top 5 constructor wins match
-4. **Fastest lap derived field** — sampled `fastestLapMs` values match `MIN(milliseconds)` from `lap_times`
+The dashboard contains six visualizations:
+1. Constructor championship points by year
+2. Top drivers by race wins
+3. Starting grid vs finishing position heatmap
+4. Average fastest lap time by circuit
+5. Average drivers per race by season
+6. Race wins by driver nationality
 
-Expected output:
-
-```
-============================================================
-   F1 DATA VALIDATION (PostgreSQL ↔ MongoDB)
-============================================================
-
---- 1. RECORD COUNT VALIDATION ---
-  ⚠  circuits: EMBEDDED IN MONGODB  →  ✔ PASS
-  ✔  constructors: PASS (212)
-  ✔  drivers: PASS (861)
-  ✔  lap_times: PASS (589081)
-  ✔  races: PASS (1125)
-  ⚠  results: EMBEDDED IN MONGODB  →  ✔ PASS
-
---- 2. CHECKSUM — Top 10 Driver Wins ---
-  ✔  Hamilton: PASS (103)
-  ...
-
---- 3. SPOT CHECK — Top 5 Constructor Wins ---
-  ✔  Ferrari: PASS (249)
-  ...
-
---- 4. SPOT CHECK — Derived fastestLapMs ---
-  ✔  All sampled fastestLapMs values match.
-
-============================================================
-  VALIDATION COMPLETE
-============================================================
-```
+All visualizations use the derived or denormalized fields produced during migration.
+The year range can be filtered from the sidebar.
 
 ---
 
-### Step 5 — Launch the Visualization Dashboard
+## Dependencies
 
-```bash
-streamlit run nosql_queries/visualisation.py
-```
-
-The dashboard opens automatically at **http://localhost:8501**
-
-It includes 6 interactive visualizations, all reading exclusively from MongoDB:
-
-| Tab | Visualization | Derived Field Used |
-|-----|--------------|-------------------|
-| 1 | Constructor Points by Year | `results.points` (embedded) |
-| 2 | Top Drivers by Race Wins | `winnerDriverName` |
-| 3 | Grid vs Finish Heatmap | `results.grid`, `results.position` |
-| 4 | Avg Fastest Lap by Circuit | `results.fastestLapMs` |
-| 5 | Drivers per Race Over Time | `totalDrivers` |
-| 6 | Win Rate by Nationality | `winnerDriverId` + denormalized nationality |
-
----
-
-## 🔄 Derived Fields Computed During Migration
-
-These fields do not exist in the original PostgreSQL schema — they are computed by the migration script:
-
-| Field | Location | Description |
-|-------|----------|-------------|
-| `fastestLapMs` | `races.results[]` | MIN(milliseconds) per driver per race from lap_times |
-| `fastestLapTime` | `races.results[]` | Human-readable format of fastestLapMs (e.g. `1:29.145`) |
-| `totalDrivers` | `races` root | Count of embedded result documents per race |
-| `winnerDriverName` | `races` root | Full name of the race winner (denormalized) |
-| `winnerConstructorName` | `races` root | Constructor name of the race winner (denormalized) |
-
----
-
-## 📊 NoSQL Design Decisions
-
-| Data | Decision | Reason |
-|------|----------|--------|
-| Circuit inside race | Embedded | Always fetched with race; never queried alone |
-| Results inside race | Embedded | Meaningless without race context |
-| Driver/Constructor name in result | Denormalized | Avoids secondary lookups at read time |
-| lap_times | Separate collection | 589,081 docs would exceed MongoDB's 16MB document limit |
-| drivers / constructors | Separate collections | Queried independently for standings |
-
----
-
-## 📦 Dependencies
+Listed in `requirements.txt`:
 
 ```
 psycopg2-binary
@@ -234,3 +236,23 @@ streamlit
 plotly
 pandas
 ```
+
+Install with:
+
+```bash
+pip install -r requirements.txt
+```
+
+---
+
+## Data Source
+
+Ergast Formula 1 dataset (1950 - 2020), sourced from Kaggle:
+https://www.kaggle.com/datasets/rohanrao/formula-1-world-championship-1950-2020
+
+---
+
+## Authors
+
+Blenda Fazliji and Kanita Bajrami
+NoSQL Database Course — 2026
