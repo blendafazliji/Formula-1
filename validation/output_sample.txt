@@ -1,22 +1,35 @@
 ============================================================
-   F1 DATA VALIDATION (PostgreSQL ↔ MongoDB)
+   F1 DATA VALIDATION  (PostgreSQL  ↔  MongoDB)
 ============================================================
 
+=== LAYER 1 — RECORD COUNTS PER ENTITY ===
+✔ count[drivers]: PASS  (PG=861 MG=861)
+✔ count[constructors]: PASS  (PG=212 MG=212)
+✔ count[races]: PASS  (PG=1125 MG=1125)
+✔ count[lap_times]: PASS  (PG=589081 MG=589081)
+✔ count[results] (embedded): PASS  (PG=26759 MG(sum of arrays)=26759)
+✔ count[circuits] (distinct used): PASS  (PG=77 MG=77)
+  (info) total circuits in PG = 77; unreferenced = 0
 
-=== RECORD COUNT VALIDATION ===
-⚠ circuits: EMBEDDED IN MONGODB (PG=77, MG=0)
-✔ constructors: PASS (212)
-✔ drivers: PASS (861)
-✔ lap_times: PASS (589081)
-✔ races: PASS (1125)
-⚠ results: EMBEDDED IN MONGODB (PG=26759, MG=0)
+=== LAYER 2 — CHECKSUMS (large tables) ===
+✔ lap_times SUM(milliseconds): PASS  (PG=56433633003 MG=56433633003)
+✔ lap_times SUM(lap): PASS  (PG=17683095 MG=17683095)
+✔ lap_times COUNT(position not null): PASS  (PG=589081 MG=589081)
+✔ results SUM(points): PASS  (PG=53187.05 MG=53187.05)
+✔ results SUM(grid): PASS  (PG=297956 MG=297956)
+✔ lap_times row-hash (XOR-fold md5): PASS  (PG=ae4143f948787e3d MG=ae4143f948787e3d)
 
-=== CHECKSUM: Top Driver Wins ===
-✔ Hamilton: PASS (103)
+=== LAYER 3 — SPOT-CHECK QUERIES ===
+✔ spot: driver wins: PASS  (115 keys)
+✔ spot: constructor wins: PASS  (47 keys)
+✔ spot: points per constructor: PASS  (211 keys)
+✔ spot: races per circuit: PASS  (77 keys)
 
-=== SPOT CHECK: Top Constructor Wins ===
-✔ Ferrari: PASS (249)
+=== LAYER 4 — DERIVED FIELDS (sample of 25 races) ===
+✔ derived: totalDrivers: PASS  (all match)
+✔ derived: winnerDriverId: PASS  (all match)
+✔ derived: fastestLapMs: PASS  (all match)
 
 ============================================================
-VALIDATION COMPLETE
+   VALIDATION COMPLETE — 19/19 checks passed
 ============================================================
