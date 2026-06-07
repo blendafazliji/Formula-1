@@ -247,7 +247,7 @@ pip install -r requirements.txt
 
 ## Data Source
 
-Ergast Formula 1 dataset (1950 - 2020), sourced from Kaggle:
+Ergast Formula 1 dataset (1950 - 2024), sourced from Kaggle:
 https://www.kaggle.com/datasets/rohanrao/formula-1-world-championship-1950-2020
 
 ---
