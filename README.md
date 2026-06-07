@@ -255,4 +255,4 @@ https://www.kaggle.com/datasets/rohanrao/formula-1-world-championship-1950-2020
 ## Authors
 
 Blenda Fazliji and Kanita Bajrami
-NoSQL Database Course — 2026
+NoSQL Database Course — South East European University — 2026
