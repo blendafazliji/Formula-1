@@ -62,7 +62,7 @@ PG_CONFIG = {
     "port":     int(os.getenv("PG_PORT", "5432")),
     "dbname":   os.getenv("PG_DB",   "formula1"),
     "user":     os.getenv("PG_USER", "postgres"),
-    "password": os.getenv("PG_PASSWORD", "blenda123"),
+    "password": os.getenv("PG_PASSWORD", "password"),
 }
 
 MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
