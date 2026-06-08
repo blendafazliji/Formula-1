@@ -54,7 +54,7 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 
-# Type-safe helpers
+# ── Type-safe helpers ──────────────────────────────────────────────────────────
 
 def safe_int(value):
     if value is None:
@@ -109,7 +109,7 @@ def bulk_upsert(collection, operations):
         )
 
 
-# Step 1 - drivers
+# ── Step 1 – drivers ───────────────────────────────────────────────────────────
 
 def migrate_drivers(pg_cur, mongo_db):
     log.info("[1/6] Migrating drivers ...")
@@ -140,7 +140,7 @@ def migrate_drivers(pg_cur, mongo_db):
     log.info("   %d drivers processed.", len(rows))
 
 
-# Step 2 - constructors
+# ── Step 2 – constructors ─────────────────────────────────────────────────────
 
 def migrate_constructors(pg_cur, mongo_db):
     log.info("[2/6] Migrating constructors ...")
@@ -171,7 +171,7 @@ def migrate_constructors(pg_cur, mongo_db):
     log.info("   %d constructors processed.", len(rows))
 
 
-# Step 3 - lap_times (high-volume)
+# ── Step 3 – lap_times (high-volume) ──────────────────────────────────────────
 # Strategy: drop + recreate for idempotency; server-side cursor to avoid
 # loading 589k rows into memory; indexes built after bulk load.
 
@@ -226,7 +226,7 @@ def migrate_lap_times(pg_cur, mongo_db):
     log.info("   lap_times indexes created.")
 
 
-# Step 4 - lookup maps used by migrate_races
+# ── Step 4 – lookup maps used by migrate_races ────────────────────────────────
 
 def fetch_circuits_map(pg_conn):
     with pg_conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
@@ -248,7 +248,9 @@ def fetch_circuits_map(pg_conn):
 
 
 def fetch_results_map(pg_conn):
-    # JOIN drivers and constructors so names are denormalized into each result
+    # JOIN drivers and constructors so names are denormalized into each result.
+    # fastestLapMs / fastestLapTime are NOT set here — they are added later
+    # only when lap data actually exists (omitted entirely when it doesn't).
     with pg_conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute("""
             SELECT
@@ -267,7 +269,7 @@ def fetch_results_map(pg_conn):
     for r in rows:
         raceid = r["raceid"]
         results_map.setdefault(raceid, []).append({
-            "raceid":                 raceid,
+            #"raceid":                 raceid,
             "driverid":               r["driverid"],
             "driverName":             f"{r['driver_forename']} {r['driver_surname']}",
             "driverNationality":      r["driver_nationality"],
@@ -277,8 +279,9 @@ def fetch_results_map(pg_conn):
             "grid":                   safe_int(r["grid"]),
             "position":               safe_int(r["position"]),
             "points":                 safe_float(r["points"]),
-            "fastestLapMs":           None,
-            "fastestLapTime":         None,
+            # fastestLapMs and fastestLapTime are intentionally omitted here.
+            # They will only be added to a result document when lap data exists,
+            # keeping early-era races (e.g. 1950s) free of null fields entirely.
         })
     return results_map
 
@@ -300,7 +303,10 @@ def fetch_fastest_laps_map(pg_conn):
     return result
 
 
-# Step 5 - races (main collection, embeds circuit + results + derived fields)
+# ── Step 5 – races (main collection) ─────────────────────────────────────────
+# Embeds circuit + results + derived fields.
+# fastestLapMs / fastestLapTime are added to a result subdocument ONLY when
+# lap data is available — documents with no lap data simply omit those fields.
 
 def migrate_races(pg_cur, mongo_db, circuits_map, results_map, fastest_laps_map):
     log.info("[5/6] Migrating races ...")
@@ -342,35 +348,36 @@ def migrate_races(pg_cur, mongo_db, circuits_map, results_map, fastest_laps_map)
                 winner_constructor_name = res["constructorName"]
                 break
 
-        # Derived: fastestLapMs and fastestLapTime per driver
+        # Derived: fastestLapMs and fastestLapTime per driver.
+        # Fields are only written when a real lap time exists — no nulls stored.
         for res in race_results:
             did   = res["driverid"]
             fl_ms = (
                 fastest_laps_map.get((raceid, did)) or
                 fastest_laps_map.get((int(raceid), int(did)))
             )
-            res["fastestLapMs"] = safe_int(fl_ms)
 
             if fl_ms:
-                total_s, ms_part = divmod(int(fl_ms), 1000)
-                mins, secs       = divmod(total_s, 60)
+                res["fastestLapMs"] = safe_int(fl_ms)
+                total_s, ms_part    = divmod(int(fl_ms), 1000)
+                mins, secs          = divmod(total_s, 60)
                 res["fastestLapTime"] = f"{mins}:{secs:02d}.{ms_part:03d}"
-            else:
-                res["fastestLapTime"] = None
+            # If fl_ms is None/0, we intentionally leave both fields absent
+            # from the document — consistent with MongoDB's schema philosophy.
 
         doc = {
-            "raceid":               raceid,
-            "year":                 r["year"],
-            "round":                r["round"],
-            "name":                 r["name"],
-            "date":                 safe_date(r["date"]),
-            "time":                 r["time"],
-            "circuit":              circuit_doc,
-            "results":              race_results,
-            "totalDrivers":         total_drivers,
-            "winnerDriverId":       winner_driver_id,
-            "winnerDriverName":     winner_driver_name,
-            "winnerConstructorId":  winner_constructor_id,
+            "raceid":                raceid,
+            "year":                  r["year"],
+            "round":                 r["round"],
+            "name":                  r["name"],
+            "date":                  safe_date(r["date"]),
+            "time":                  r["time"],
+            "circuit":               circuit_doc,
+            "results":               race_results,
+            "totalDrivers":          total_drivers,
+            "winnerDriverId":        winner_driver_id,
+            "winnerDriverName":      winner_driver_name,
+            "winnerConstructorId":   winner_constructor_id,
             "winnerConstructorName": winner_constructor_name,
         }
 
@@ -383,7 +390,7 @@ def migrate_races(pg_cur, mongo_db, circuits_map, results_map, fastest_laps_map)
     log.info("   %d races processed.", len(races))
 
 
-# Step 6 - indexes
+# ── Step 6 – indexes ──────────────────────────────────────────────────────────
 
 def create_indexes(mongo_db):
     log.info("[6/6] Creating indexes ...")
@@ -398,6 +405,8 @@ def create_indexes(mongo_db):
 
     log.info("   All indexes created.")
 
+
+# ── Entry point ───────────────────────────────────────────────────────────────
 
 def main():
     start = datetime.now()
